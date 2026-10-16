@@ -1,17 +1,36 @@
-<!-- index.html -->
+
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FootballHub | Painel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FootballHub | Início</title>
     <link rel="stylesheet" href="style.css">
-    <script src="js/app.js" defer></script>
 </head>
+<body>
+    <header class="topo">
+        <a class="logo" href="index.html">⚽ FootballHub</a>
+        <nav><a href="index.html">Início</a></nav>
+    </header>
 
-<body data-page="dashboard">
-    <div id="app"></div>
+    <main class="container">
+        <section class="hero">
+            <p class="etiqueta">GESTÃO DO FUTEBOL</p>
+            <h1>Bem-vindo ao FootballHub</h1>
+            <p>Gerencie clubes, jogadores, competições, temporadas e partidas em um só lugar.</p>
+        </section>
+
+        <section class="cards">
+            <a class="card" href="clubes.html"><span>🏟️</span><h2>Clubes</h2><p>Cadastre e gerencie clubes.</p></a>
+            <a class="card" href="jogadores.html"><span>👟</span><h2>Jogadores</h2><p>Gerencie atletas e seus clubes.</p></a>
+            <a class="card" href="competicoes.html"><span>🏆</span><h2>Competições</h2><p>Organize torneios e campeonatos.</p></a>
+            <a class="card" href="temporadas.html"><span>📅</span><h2>Temporadas</h2><p>Controle as temporadas.</p></a>
+            <a class="card" href="partidas.html"><span>⚽</span><h2>Partidas</h2><p>Registre jogos e placares.</p></a>
+            <a class="card" href="eventos.html"><span>📋</span><h2>Eventos</h2><p>Registre gols, cartões e outros eventos.</p></a>
+            <a class="card" href="usuarios.html"><span>👤</span><h2>Usuários</h2><p>Gerencie os usuários do sistema.</p></a>
+        </section>
+    </main>
+
+    <footer>FootballHub — Sistema de gerenciamento de futebol</footer>
 </body>
-
 </html>

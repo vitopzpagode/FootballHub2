@@ -1,17 +1,42 @@
-<!-- usuarios.html -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FootballHub | Usuários</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuários | FootballHub</title>
     <link rel="stylesheet" href="style.css">
-    <script src="js/app.js" defer></script>
+    <script src="script.js" defer></script>
 </head>
 
-<body data-page="usuarios">
-    <div id="app"></div>
+<body>
+    <header class="topo"><a class="logo" href="index.html">⚽ FootballHub</a>
+        <nav><a href="index.html">Início</a></nav>
+    </header>
+    <main class="container" data-resource="usuarios">
+        <a class="voltar" href="index.html">← Voltar ao início</a>
+        <h1>Usuários</h1>
+        <p>Gerencie os usuários cadastrados no sistema.</p>
+        <div id="mensagem" class="mensagem" role="status"></div>
+        <section class="painel">
+            <h2 id="titulo-form">Cadastrar usuário</h2>
+            <form id="form-registro">
+                <div id="campos-form" class="form-grid"></div>
+                <div class="acoes"><button type="submit" id="btn-salvar">Cadastrar usuário</button><button type="button"
+                        id="btn-cancelar" class="secundario" hidden>Cancelar edição</button></div>
+            </form>
+        </section>
+        <section class="painel">
+            <h2>Usuários cadastrados</h2>
+            <div class="tabela-container">
+                <table>
+                    <thead id="tabela-head"></thead>
+                    <tbody id="tabela-body"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+    <footer>FootballHub</footer>
 </body>
 
 </html>

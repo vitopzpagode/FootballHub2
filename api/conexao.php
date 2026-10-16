@@ -1,19 +1,15 @@
 
 <?php
-declare(strict_types=1);
-
-header('Content-Type: application/json; charset=utf-8');
-
-$host = 'localhost';
-$dbname = 'footballhub';
-$username = 'root';
-$password = '';
+$host = "localhost";
+$banco = "footballhub";
+$usuario = "root";
+$senha = "";
 
 try {
     $pdo = new PDO(
-        "mysql:host={$host};dbname={$dbname};charset=utf8mb4",
-        $username,
-        $password,
+        "mysql:host=$host;dbname=$banco;charset=utf8mb4",
+        $usuario,
+        $senha,
         [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -22,11 +18,10 @@ try {
     );
 } catch (PDOException $e) {
     http_response_code(500);
-
+    header("Content-Type: application/json; charset=utf-8");
     echo json_encode([
-        'success' => false,
-        'message' => 'Não foi possível conectar ao banco footballhub. Confira o MySQL e as credenciais.'
-    ], JSON_UNESCAPED_UNICODE);
-
+        "sucesso" => false,
+        "mensagem" => "Não foi possível conectar ao banco de dados."
+    ]);
     exit;
 }

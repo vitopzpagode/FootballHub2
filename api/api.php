@@ -1,311 +1,441 @@
 
 <?php
-declare(strict_types=1);
 
-require_once __DIR__ . '/conexao.php';
+// A API deve responder em JSON, inclusive quando ocorrer um erro.
+ini_set("display_errors", "0");
+ini_set("log_errors", "1");
 
-header('Content-Type: application/json; charset=utf-8');
+header("Content-Type: application/json; charset=utf-8");
 
-$schema = [
-    'clubes' => [
-        'table' => 'clubes',
-        'pk' => 'clube_id',
-        'columns' => [
-            'nome', 'pais', 'cidade', 'estadio', 'ano_fundacao', 'escudo_url'
-        ]
-    ],
-    'jogadores' => [
-        'table' => 'jogadores',
-        'pk' => 'jogador_id',
-        'columns' => [
-            'nome', 'clube_id', 'posicao', 'numero_camisa',
-            'nacionalidade', 'data_nascimento', 'altura', 'peso',
-            'pe_dominante', 'valor_mercado', 'status'
-        ]
-    ],
-    'competicoes' => [
-        'table' => 'competicoes',
-        'pk' => 'competicao_id',
-        'columns' => [
-            'nome', 'tipo', 'pais', 'organizacao', 'descricao'
-        ]
-    ],
-    'temporadas' => [
-        'table' => 'temporadas',
-        'pk' => 'temporada_id',
-        'columns' => [
-            'competicao_id', 'nome', 'data_inicio', 'data_fim', 'status'
-        ]
-    ],
-    'partidas' => [
-        'table' => 'partidas',
-        'pk' => 'partida_id',
-        'columns' => [
-            'temporada_id', 'competicao_id', 'rodada',
-            'mandante_id', 'visitante_id', 'data_hora', 'estadio',
-            'gols_mandante', 'gols_visitante', 'status'
-        ]
-    ],
-    'eventos_partida' => [
-        'table' => 'eventos_partida',
-        'pk' => 'evento_id',
-        'columns' => [
-            'partida_id', 'jogador_id', 'jogador_substituido_id',
-            'tipo', 'minuto', 'descricao'
-        ]
-    ],
-    'usuarios' => [
-        'table' => 'usuarios',
-        'pk' => 'usuario_id',
-        'columns' => [
-            'nome', 'email', 'senha', 'perfil'
-        ]
-    ]
-];
+ob_start();
 
-function respond(array $data, int $status = 200): never
-{
+function responder($dados, $status = 200) {
+    if (ob_get_length()) {
+        ob_clean();
+    }
+
     http_response_code($status);
-
     echo json_encode(
-        $data,
+        $dados,
         JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
     );
-
     exit;
 }
 
-function getInput(): array
-{
-    $raw = file_get_contents('php://input');
-    $data = json_decode($raw ?: '{}', true);
+// Converte erros fatais em uma resposta JSON quando possível.
+register_shutdown_function(function () {
+    $erro = error_get_last();
 
-    if (!is_array($data)) {
-        respond([
-            'success' => false,
-            'message' => 'O corpo da solicitação não contém JSON válido.'
-        ], 400);
-    }
+    if ($erro && in_array($erro["type"], [
+        E_ERROR,
+        E_PARSE,
+        E_CORE_ERROR,
+        E_COMPILE_ERROR
+    ], true)) {
+        error_log(
+            "Erro fatal na API: " .
+            $erro["message"] .
+            " em " .
+            $erro["file"] .
+            ":" .
+            $erro["line"]
+        );
 
-    return $data;
-}
-
-function getResource(array $input, array $schema): array
-{
-    $resource = $input['resource'] ?? '';
-
-    if (!is_string($resource) || !isset($schema[$resource])) {
-        respond([
-            'success' => false,
-            'message' => 'Seção inválida ou não permitida.'
-        ], 400);
-    }
-
-    return [$resource, $schema[$resource]];
-}
-
-function getRecordData(array $input, array $config): array
-{
-    $data = $input['data'] ?? null;
-
-    if (!is_array($data)) {
-        respond([
-            'success' => false,
-            'message' => 'Os dados do formulário não foram recebidos corretamente.'
-        ], 400);
-    }
-
-    $clean = [];
-
-    foreach ($config['columns'] as $column) {
-        if (array_key_exists($column, $data)) {
-            $value = $data[$column];
-
-            if (is_array($value) || is_object($value)) {
-                respond([
-                    'success' => false,
-                    'message' => "Valor inválido para o campo {$column}."
-                ], 400);
+        if (!headers_sent()) {
+            if (ob_get_length()) {
+                ob_clean();
             }
 
-            $clean[$column] = $value === '' ? null : $value;
+            http_response_code(500);
+            header("Content-Type: application/json; charset=utf-8");
+            echo json_encode([
+                "sucesso" => false,
+                "mensagem" => "O PHP encontrou um erro interno. Confira o log de erros do Apache."
+            ], JSON_UNESCAPED_UNICODE);
+        }
+    }
+});
+
+set_exception_handler(function ($erro) {
+    error_log("Exceção não tratada na API: " . $erro->getMessage());
+
+    responder([
+        "sucesso" => false,
+        "mensagem" => "Ocorreu um erro interno no servidor."
+    ], 500);
+});
+
+require_once __DIR__ . "/conexao.php";
+
+$estrutura = [
+    "clubes" => [
+        "campos" => [
+            "nome", "sigla", "pais", "cidade", "estadio", "data_fundacao"
+        ],
+        "obrigatorios" => ["nome", "sigla", "pais"]
+    ],
+
+    "jogadores" => [
+        "campos" => [
+            "nome", "data_nascimento", "nacionalidade",
+            "posicao", "numero_camisa", "clube_id"
+        ],
+        "obrigatorios" => ["nome"]
+    ],
+
+    "competicoes" => [
+        "campos" => ["nome", "tipo", "pais"],
+        "obrigatorios" => ["nome"]
+    ],
+
+    "temporadas" => [
+        "campos" => [
+            "competicao_id", "nome", "ano_inicio", "ano_fim"
+        ],
+        "obrigatorios" => [
+            "competicao_id", "nome", "ano_inicio", "ano_fim"
+        ]
+    ],
+
+    "partidas" => [
+        "campos" => [
+            "temporada_id", "mandante_id", "visitante_id",
+            "data_hora", "estadio", "gols_mandante",
+            "gols_visitante", "status"
+        ],
+        "obrigatorios" => [
+            "temporada_id", "mandante_id", "visitante_id",
+            "data_hora", "gols_mandante", "gols_visitante"
+        ]
+    ],
+
+    "eventos_partida" => [
+        "campos" => [
+            "partida_id", "jogador_id", "minuto", "tipo", "descricao"
+        ],
+        "obrigatorios" => ["partida_id", "tipo"]
+    ],
+
+    "usuarios" => [
+        "campos" => ["nome", "email", "senha", "perfil"],
+        "obrigatorios" => ["nome", "email", "senha", "perfil"]
+    ]
+];
+
+function validarRecurso($recurso, $estrutura) {
+    if (!is_string($recurso) || !isset($estrutura[$recurso])) {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "Recurso inválido."
+        ], 400);
+    }
+}
+
+function validarId($valor) {
+    $id = filter_var($valor, FILTER_VALIDATE_INT);
+
+    if (!$id || $id < 1) {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "ID inválido."
+        ], 400);
+    }
+
+    return $id;
+}
+
+function validarDados($recurso, $dados, $estrutura, $acao) {
+    if (!is_array($dados)) {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "Os dados enviados são inválidos."
+        ], 400);
+    }
+
+    $camposPermitidos = $estrutura[$recurso]["campos"];
+
+    foreach ($dados as $campo => $valor) {
+        if (!in_array($campo, $camposPermitidos, true)) {
+            responder([
+                "sucesso" => false,
+                "mensagem" => "Campo não permitido: " . $campo
+            ], 400);
         }
     }
 
-    if (!$clean) {
-        respond([
-            'success' => false,
-            'message' => 'Nenhum campo válido foi enviado.'
+    foreach ($estrutura[$recurso]["obrigatorios"] as $campo) {
+        if ($acao === "criar") {
+            if (
+                !array_key_exists($campo, $dados) ||
+                $dados[$campo] === null ||
+                $dados[$campo] === ""
+            ) {
+                responder([
+                    "sucesso" => false,
+                    "mensagem" => "Preencha o campo obrigatório: " . $campo . "."
+                ], 400);
+            }
+        } elseif (
+            array_key_exists($campo, $dados) &&
+            ($dados[$campo] === null || $dados[$campo] === "")
+        ) {
+            responder([
+                "sucesso" => false,
+                "mensagem" => "O campo " . $campo . " não pode ficar vazio."
+            ], 400);
+        }
+    }
+
+    if (
+        $recurso === "usuarios" &&
+        isset($dados["email"]) &&
+        !filter_var($dados["email"], FILTER_VALIDATE_EMAIL)
+    ) {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "Informe um e-mail válido."
         ], 400);
     }
 
-    return $clean;
+    if (
+        $recurso === "usuarios" &&
+        $acao === "criar" &&
+        isset($dados["senha"]) &&
+        strlen($dados["senha"]) < 6
+    ) {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "A senha deve ter pelo menos 6 caracteres."
+        ], 400);
+    }
+
+    if (
+        $recurso === "usuarios" &&
+        $acao === "atualizar" &&
+        isset($dados["senha"]) &&
+        strlen($dados["senha"]) < 6
+    ) {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "A nova senha deve ter pelo menos 6 caracteres."
+        ], 400);
+    }
+
+    if ($recurso === "partidas") {
+        $mandante = $dados["mandante_id"] ?? null;
+        $visitante = $dados["visitante_id"] ?? null;
+
+        if (
+            $mandante !== null &&
+            $visitante !== null &&
+            (string)$mandante === (string)$visitante
+        ) {
+            responder([
+                "sucesso" => false,
+                "mensagem" => "O clube mandante e o visitante precisam ser diferentes."
+            ], 400);
+        }
+    }
 }
 
 try {
-    $input = getInput();
-    $action = $input['action'] ?? '';
+    // LISTAGEM
+    if ($_SERVER["REQUEST_METHOD"] === "GET") {
+        $recurso = $_GET["recurso"] ?? "";
+        validarRecurso($recurso, $estrutura);
 
-    if ($action === 'health') {
-        $pdo->query('SELECT 1');
-
-        respond([
-            'success' => true,
-            'message' => 'Conexão com o banco estabelecida.'
-        ]);
-    }
-
-    [$resource, $config] = getResource($input, $schema);
-
-    $table = $config['table'];
-    $pk = $config['pk'];
-
-    if ($action === 'list') {
-        $stmt = $pdo->query("SELECT * FROM `{$table}` ORDER BY `{$pk}` DESC");
-
-        respond([
-            'success' => true,
-            'data' => $stmt->fetchAll()
-        ]);
-    }
-
-    if ($action === 'create') {
-        $data = getRecordData($input, $config);
-
-        // O hash é compatível com password_verify() no PHP.
-        // Caso seu sistema de login use outra estratégia, alinhe os dois lados.
-        if ($resource === 'usuarios' && !empty($data['senha'])) {
-            $data['senha'] = password_hash(
-                (string)$data['senha'],
-                PASSWORD_DEFAULT
-            );
-        }
-
-        $columns = array_keys($data);
-        $quotedColumns = array_map(
-            fn($column) => "`{$column}`",
-            $columns
+        $stmt = $pdo->query(
+            "SELECT * FROM `" . $recurso . "` ORDER BY id DESC"
         );
-        $placeholders = array_fill(0, count($columns), '?');
 
-        $sql = "INSERT INTO `{$table}` (" .
-            implode(', ', $quotedColumns) .
-            ') VALUES (' .
-            implode(', ', $placeholders) .
-            ')';
+        $registros = $stmt->fetchAll();
 
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute(array_values($data));
-
-        respond([
-            'success' => true,
-            'message' => 'Cadastro realizado com sucesso.',
-            'id' => $pdo->lastInsertId()
-        ], 201);
-    }
-
-    if ($action === 'update') {
-        $id = $input['id'] ?? $input[$pk] ?? null;
-
-        if (!is_scalar($id) || (string)$id === '') {
-            respond([
-                'success' => false,
-                'message' => 'ID do registro não informado.'
-            ], 400);
-        }
-
-        $data = getRecordData($input, $config);
-
-        // Senha em branco significa manter a senha atual.
-        if ($resource === 'usuarios') {
-            if (empty($data['senha'])) {
-                unset($data['senha']);
-            } else {
-                $data['senha'] = password_hash(
-                    (string)$data['senha'],
-                    PASSWORD_DEFAULT
-                );
+        // Não envia hashes de senhas ao navegador.
+        if ($recurso === "usuarios") {
+            foreach ($registros as &$registro) {
+                unset($registro["senha"]);
             }
+            unset($registro);
         }
 
-        if (!$data) {
-            respond([
-                'success' => false,
-                'message' => 'Nenhuma alteração foi informada.'
-            ], 400);
-        }
-
-        $assignments = [];
-
-        foreach (array_keys($data) as $column) {
-            $assignments[] = "`{$column}` = ?";
-        }
-
-        $sql = "UPDATE `{$table}` SET " .
-            implode(', ', $assignments) .
-            " WHERE `{$pk}` = ?";
-
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([...array_values($data), $id]);
-
-        respond([
-            'success' => true,
-            'message' => 'Registro atualizado com sucesso.'
+        responder([
+            "sucesso" => true,
+            "registros" => $registros
         ]);
     }
 
-    if ($action === 'delete') {
-        $id = $input['id'] ?? $input[$pk] ?? null;
+    // Só aceitamos GET e POST.
+    if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "Método HTTP não permitido."
+        ], 405);
+    }
 
-        if (!is_scalar($id) || (string)$id === '') {
-            respond([
-                'success' => false,
-                'message' => 'ID do registro não informado.'
-            ], 400);
-        }
+    $textoEntrada = file_get_contents("php://input");
+    $entrada = json_decode($textoEntrada, true);
+
+    if (!is_array($entrada) || json_last_error() !== JSON_ERROR_NONE) {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "O corpo da solicitação não contém JSON válido."
+        ], 400);
+    }
+
+    $acao = $entrada["acao"] ?? "";
+    $recurso = $entrada["recurso"] ?? "";
+
+    validarRecurso($recurso, $estrutura);
+
+    // EXCLUSÃO
+    if ($acao === "excluir") {
+        $id = validarId($entrada["id"] ?? null);
 
         $stmt = $pdo->prepare(
-            "DELETE FROM `{$table}` WHERE `{$pk}` = ?"
+            "DELETE FROM `" . $recurso . "` WHERE id = ?"
         );
         $stmt->execute([$id]);
 
         if ($stmt->rowCount() === 0) {
-            respond([
-                'success' => false,
-                'message' => 'Registro não encontrado ou já excluído.'
+            responder([
+                "sucesso" => false,
+                "mensagem" => "Registro não encontrado."
             ], 404);
         }
 
-        respond([
-            'success' => true,
-            'message' => 'Registro excluído com sucesso.'
+        responder([
+            "sucesso" => true,
+            "mensagem" => "Registro excluído com sucesso."
         ]);
     }
 
-    respond([
-        'success' => false,
-        'message' => 'Ação não reconhecida.'
-    ], 400);
-
-} catch (PDOException $e) {
-    error_log('FootballHub PDO: ' . $e->getMessage());
-
-    $message = 'Erro no banco de dados. Verifique os campos obrigatórios, os tipos e os relacionamentos.';
-
-    if ($e->getCode() === '23000') {
-        $message = 'Não foi possível salvar: há um relacionamento inválido ou um valor duplicado.';
+    if (!in_array($acao, ["criar", "atualizar"], true)) {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "Ação inválida."
+        ], 400);
     }
 
-    respond([
-        'success' => false,
-        'message' => $message
+    $dados = $entrada["dados"] ?? [];
+    validarDados($recurso, $dados, $estrutura, $acao);
+
+    // CADASTRO
+    if ($acao === "criar") {
+        if ($recurso === "usuarios") {
+            $dados["senha"] = password_hash(
+                $dados["senha"],
+                PASSWORD_DEFAULT
+            );
+        }
+
+        $campos = array_keys($dados);
+
+        if (count($campos) === 0) {
+            responder([
+                "sucesso" => false,
+                "mensagem" => "Nenhum dado foi enviado."
+            ], 400);
+        }
+
+        $nomes = implode(
+            ", ",
+            array_map(fn($campo) => "`" . $campo . "`", $campos)
+        );
+
+        $marcadores = implode(
+            ", ",
+            array_fill(0, count($campos), "?")
+        );
+
+        $sql = "INSERT INTO `" . $recurso . "` ($nomes) VALUES ($marcadores)";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_values($dados));
+
+        responder([
+            "sucesso" => true,
+            "mensagem" => "Registro cadastrado com sucesso.",
+            "id" => $pdo->lastInsertId()
+        ], 201);
+    }
+
+    // ATUALIZAÇÃO
+    $id = validarId($entrada["id"] ?? null);
+
+    if ($recurso === "usuarios" && !empty($dados["senha"])) {
+        $dados["senha"] = password_hash(
+            $dados["senha"],
+            PASSWORD_DEFAULT
+        );
+    }
+
+    if (count($dados) === 0) {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "Nenhum campo foi enviado para atualização."
+        ], 400);
+    }
+
+    $partes = [];
+
+    foreach (array_keys($dados) as $campo) {
+        $partes[] = "`" . $campo . "` = ?";
+    }
+
+    $sql = "UPDATE `" . $recurso . "` SET " .
+        implode(", ", $partes) .
+        " WHERE id = ?";
+
+    $valores = array_values($dados);
+    $valores[] = $id;
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($valores);
+
+    // Confere se o registro existe, inclusive quando nenhum valor mudou.
+    $verificar = $pdo->prepare(
+        "SELECT id FROM `" . $recurso . "` WHERE id = ?"
+    );
+    $verificar->execute([$id]);
+
+    if (!$verificar->fetch()) {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "Registro não encontrado."
+        ], 404);
+    }
+
+    responder([
+        "sucesso" => true,
+        "mensagem" => "Registro atualizado com sucesso."
+    ]);
+
+} catch (PDOException $erro) {
+    error_log(
+        "Erro PDO na API FootballHub: " .
+        $erro->getMessage()
+    );
+
+    if ($erro->getCode() === "23000") {
+        responder([
+            "sucesso" => false,
+            "mensagem" => "Não foi possível concluir. Verifique se o e-mail já existe ou se há registros relacionados."
+        ], 409);
+    }
+
+    responder([
+        "sucesso" => false,
+        "mensagem" => "Erro ao consultar o banco. Confira os nomes das tabelas e colunas e as relações entre elas."
     ], 500);
 
-} catch (Throwable $e) {
-    error_log('FootballHub: ' . $e->getMessage());
+} catch (Throwable $erro) {
+    error_log(
+        "Erro na API FootballHub: " .
+        $erro->getMessage()
+    );
 
-    respond([
-        'success' => false,
-        'message' => 'Ocorreu um erro interno ao processar a solicitação.'
+    responder([
+        "sucesso" => false,
+        "mensagem" => "Ocorreu um erro interno no servidor. Confira o log de erros do Apache."
     ], 500);
 }

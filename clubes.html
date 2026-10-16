@@ -1,17 +1,38 @@
-<!-- clubes.html -->
+
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FootballHub | Clubes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clubes | FootballHub</title>
     <link rel="stylesheet" href="style.css">
-    <script src="js/app.js" defer></script>
+    <script src="script.js" defer></script>
 </head>
-
-<body data-page="clubes">
-    <div id="app"></div>
+<body>
+<header class="topo">
+    <a class="logo" href="index.html">⚽ FootballHub</a>
+    <nav><a href="index.html">Início</a></nav>
+</header>
+<main class="container" data-resource="clubes">
+    <a class="voltar" href="index.html">← Voltar ao início</a>
+    <h1>Clubes</h1>
+    <p>Cadastre, consulte, edite e exclua clubes.</p>
+    <div id="mensagem" class="mensagem" role="status"></div>
+    <section class="painel">
+        <h2 id="titulo-form">Cadastrar clube</h2>
+        <form id="form-registro">
+            <div id="campos-form" class="form-grid"></div>
+            <div class="acoes">
+                <button type="submit" id="btn-salvar">Cadastrar clube</button>
+                <button type="button" id="btn-cancelar" class="secundario" hidden>Cancelar edição</button>
+            </div>
+        </form>
+    </section>
+    <section class="painel">
+        <h2>Clubes cadastrados</h2>
+        <div class="tabela-container"><table><thead id="tabela-head"></thead><tbody id="tabela-body"></tbody></table></div>
+    </section>
+</main>
+<footer>FootballHub</footer>
 </body>
-
 </html>

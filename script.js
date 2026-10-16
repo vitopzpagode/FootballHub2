@@ -1,801 +1,617 @@
 
-"use strict";
+// As páginas HTML ficam na raiz do projeto; a API fica na pasta api/.
+const API = "api/api.php";
 
-const API_URL = "api/api.php";
-
-const TABLES = {
+const configuracoes = {
     clubes: {
-        title: "Clubes",
-        singular: "clube",
-        key: "clube_id",
-        columns: [
-            ["nome", "Nome"],
-            ["pais", "País"],
-            ["cidade", "Cidade"],
-            ["estadio", "Estádio"],
-            ["ano_fundacao", "Fundação"]
-        ],
-        fields: [
-            ["nome", "Nome do clube", "text", true],
-            ["pais", "País", "text", false, "Brasil"],
-            ["cidade", "Cidade", "text"],
-            ["estadio", "Estádio", "text"],
-            ["ano_fundacao", "Ano de fundação", "number"],
-            ["escudo_url", "URL do escudo", "url"]
+        titulo: "clube",
+        campos: [
+            { nome: "nome", label: "Nome do clube", required: true },
+            { nome: "sigla", label: "Sigla", required: true },
+            { nome: "pais", label: "País", required: true },
+            { nome: "cidade", label: "Cidade" },
+            { nome: "estadio", label: "Estádio" },
+            { nome: "data_fundacao", label: "Data de fundação", tipo: "date" }
         ]
     },
+
     jogadores: {
-        title: "Jogadores",
-        singular: "jogador",
-        key: "jogador_id",
-        columns: [
-            ["nome", "Nome"],
-            ["clube_id", "ID do clube"],
-            ["posicao", "Posição"],
-            ["numero_camisa", "Camisa"],
-            ["nacionalidade", "Nacionalidade"],
-            ["status", "Status"]
-        ],
-        fields: [
-            ["nome", "Nome completo", "text", true],
-            ["clube_id", "ID do clube", "number", true],
-            ["posicao", "Posição", "select", true, "", [
-                ["GOLEIRO", "Goleiro"],
-                ["ZAGUEIRO", "Zagueiro"],
-                ["LATERAL", "Lateral"],
-                ["VOLANTE", "Volante"],
-                ["MEIA", "Meia"],
-                ["MEIO_CAMPISTA", "Meio-campista"],
-                ["PONTA", "Ponta"],
-                ["ATACANTE", "Atacante"]
-            ]],
-            ["numero_camisa", "Número da camisa", "number"],
-            ["nacionalidade", "Nacionalidade", "text"],
-            ["data_nascimento", "Data de nascimento", "date"],
-            ["altura", "Altura em metros", "number"],
-            ["peso", "Peso em kg", "number"],
-            ["pe_dominante", "Pé dominante", "select", false, "", [
-                ["DIREITO", "Direito"],
-                ["ESQUERDO", "Esquerdo"],
-                ["AMBIDESTRO", "Ambidestro"]
-            ]],
-            ["valor_mercado", "Valor de mercado (R$)", "number"],
-            ["status", "Status", "select", false, "", [
-                ["ATIVO", "Ativo"],
-                ["LESIONADO", "Lesionado"],
-                ["SUSPENSO", "Suspenso"],
-                ["INATIVO", "Inativo"]
-            ]]
+        titulo: "jogador",
+        campos: [
+            { nome: "nome", label: "Nome do jogador", required: true },
+            { nome: "data_nascimento", label: "Data de nascimento", tipo: "date" },
+            { nome: "nacionalidade", label: "Nacionalidade" },
+            {
+                nome: "posicao",
+                label: "Posição",
+                tipo: "select",
+                placeholder: "Selecione uma posição",
+                opcoes: ["Goleiro", "Zagueiro", "Lateral", "Volante", "Meia", "Ponta", "Atacante"]
+            },
+            { nome: "numero_camisa", label: "Número da camisa", tipo: "number" },
+            {
+                nome: "clube_id",
+                label: "Clube",
+                tipo: "relacao",
+                recurso: "clubes",
+                placeholder: "Selecione um clube"
+            }
         ]
     },
+
     competicoes: {
-        title: "Competições",
-        singular: "competição",
-        key: "competicao_id",
-        columns: [
-            ["nome", "Nome"],
-            ["tipo", "Tipo"],
-            ["pais", "País"],
-            ["organizacao", "Organização"]
-        ],
-        fields: [
-            ["nome", "Nome da competição", "text", true],
-            ["tipo", "Tipo de competição", "text"],
-            ["pais", "País", "text"],
-            ["organizacao", "Organização", "text"],
-            ["descricao", "Descrição", "textarea"]
+        titulo: "competição",
+        campos: [
+            { nome: "nome", label: "Nome da competição", required: true },
+            {
+                nome: "tipo",
+                label: "Tipo",
+                tipo: "select",
+                placeholder: "Selecione um tipo de competição",
+                opcoes: ["Liga", "Copa", "Campeonato", "Amistoso", "Outro"]
+            },
+            { nome: "pais", label: "País" }
         ]
     },
+
     temporadas: {
-        title: "Temporadas",
-        singular: "temporada",
-        key: "temporada_id",
-        columns: [
-            ["nome", "Temporada"],
-            ["competicao_id", "ID da competição"],
-            ["data_inicio", "Início"],
-            ["data_fim", "Término"],
-            ["status", "Status"]
-        ],
-        fields: [
-            ["competicao_id", "ID da competição", "number", true],
-            ["nome", "Nome da temporada", "text", true],
-            ["data_inicio", "Data de início", "date"],
-            ["data_fim", "Data de término", "date"],
-            ["status", "Status", "text"]
+        titulo: "temporada",
+        campos: [
+            {
+                nome: "competicao_id",
+                label: "Competição",
+                tipo: "relacao",
+                recurso: "competicoes",
+                placeholder: "Selecione uma competição",
+                required: true
+            },
+            { nome: "nome", label: "Nome da temporada", required: true },
+            { nome: "ano_inicio", label: "Ano inicial", tipo: "number", required: true },
+            { nome: "ano_fim", label: "Ano final", tipo: "number", required: true }
         ]
     },
+
     partidas: {
-        title: "Partidas",
-        singular: "partida",
-        key: "partida_id",
-        columns: [
-            ["mandante_id", "Mandante (ID)"],
-            ["visitante_id", "Visitante (ID)"],
-            ["data_hora", "Data e hora"],
-            ["gols_mandante", "Gols casa"],
-            ["gols_visitante", "Gols fora"],
-            ["status", "Status"]
-        ],
-        fields: [
-            ["temporada_id", "ID da temporada", "number"],
-            ["competicao_id", "ID da competição", "number"],
-            ["rodada", "Rodada", "text"],
-            ["mandante_id", "ID do clube mandante", "number", true],
-            ["visitante_id", "ID do clube visitante", "number", true],
-            ["data_hora", "Data e hora", "datetime-local"],
-            ["estadio", "Estádio", "text"],
-            ["gols_mandante", "Gols do mandante", "number", false, "0"],
-            ["gols_visitante", "Gols do visitante", "number", false, "0"],
-            ["status", "Status", "text"]
+        titulo: "partida",
+        campos: [
+            {
+                nome: "temporada_id",
+                label: "Temporada",
+                tipo: "relacao",
+                recurso: "temporadas",
+                placeholder: "Selecione uma temporada",
+                required: true
+            },
+            {
+                nome: "mandante_id",
+                label: "Clube mandante",
+                tipo: "relacao",
+                recurso: "clubes",
+                placeholder: "Selecione o clube mandante",
+                required: true
+            },
+            {
+                nome: "visitante_id",
+                label: "Clube visitante",
+                tipo: "relacao",
+                recurso: "clubes",
+                placeholder: "Selecione o clube visitante",
+                required: true
+            },
+            { nome: "data_hora", label: "Data e hora", tipo: "datetime-local", required: true },
+            { nome: "estadio", label: "Estádio" },
+            { nome: "gols_mandante", label: "Gols do mandante", tipo: "number", required: true },
+            { nome: "gols_visitante", label: "Gols do visitante", tipo: "number", required: true },
+            {
+                nome: "status",
+                label: "Status",
+                tipo: "select",
+                placeholder: "Selecione o status da partida",
+                opcoes: ["Agendada", "Em andamento", "Finalizada", "Cancelada"]
+            }
         ]
     },
+
     eventos_partida: {
-        title: "Eventos das partidas",
-        singular: "evento",
-        key: "evento_id",
-        columns: [
-            ["partida_id", "Partida (ID)"],
-            ["jogador_id", "Jogador (ID)"],
-            ["tipo", "Tipo"],
-            ["minuto", "Minuto"],
-            ["descricao", "Descrição"]
-        ],
-        fields: [
-            ["partida_id", "ID da partida", "number", true],
-            ["jogador_id", "ID do jogador", "number"],
-            ["jogador_substituido_id", "ID do jogador substituído", "number"],
-            ["tipo", "Tipo de evento", "text", true],
-            ["minuto", "Minuto", "number"],
-            ["descricao", "Descrição", "textarea"]
+        titulo: "evento",
+        campos: [
+            {
+                nome: "partida_id",
+                label: "Partida",
+                tipo: "relacao",
+                recurso: "partidas",
+                placeholder: "Selecione uma partida",
+                required: true
+            },
+            {
+                nome: "jogador_id",
+                label: "Jogador",
+                tipo: "relacao",
+                recurso: "jogadores",
+                placeholder: "Selecione um jogador"
+            },
+            { nome: "minuto", label: "Minuto", tipo: "number" },
+            {
+                nome: "tipo",
+                label: "Tipo de evento",
+                tipo: "select",
+                placeholder: "Selecione o tipo de evento",
+                opcoes: ["Gol", "Gol contra", "Cartão amarelo", "Cartão vermelho", "Substituição", "Pênalti", "Outro"],
+                required: true
+            },
+            { nome: "descricao", label: "Descrição" }
         ]
     },
+
     usuarios: {
-        title: "Usuários",
-        singular: "usuário",
-        key: "usuario_id",
-        columns: [
-            ["nome", "Nome"],
-            ["email", "E-mail"],
-            ["perfil", "Perfil"]
-        ],
-        fields: [
-            ["nome", "Nome completo", "text", true],
-            ["email", "E-mail", "email", true],
-            ["senha", "Senha", "password", true],
-            ["perfil", "Perfil", "select", true, "COMUM", [
-                ["ADMIN", "Administrador"],
-                ["COMUM", "Usuário comum"]
-            ]]
+        titulo: "usuário",
+        campos: [
+            { nome: "nome", label: "Nome completo", required: true },
+            { nome: "email", label: "E-mail", tipo: "email", required: true },
+            {
+                nome: "senha",
+                label: "Senha",
+                tipo: "password",
+                required: true
+            },
+            {
+                nome: "perfil",
+                label: "Perfil",
+                tipo: "select",
+                placeholder: "Selecione um perfil",
+                opcoes: ["Administrador", "Usuário"],
+                required: true
+            }
         ]
     }
 };
 
-const PAGE = document.body.dataset.page || "dashboard";
-const app = document.querySelector("#app");
-let records = [];
-let editing = null;
-let busy = false;
+const elemento = id => document.getElementById(id);
+const recurso = document.querySelector("[data-resource]")?.dataset.resource;
+const config = configuracoes[recurso];
 
-const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;",
-    '"': "&quot;", "'": "&#39;"
-}[c]));
+let registroEditando = null;
+let registros = [];
+const cacheRelacionamentos = {};
 
-function pageName(resource) {
-    return resource === "eventos_partida" ? "eventos" : resource;
+// Escapa textos antes de inserir valores em HTML.
+function escapar(valor) {
+    return String(valor ?? "").replace(/[&<>"']/g, caractere => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[caractere]);
 }
 
-function navigation() {
-    const links = [
-        ["dashboard", "⌂", "Painel"],
-        ["clubes", "⚽", "Clubes"],
-        ["jogadores", "♟", "Jogadores"],
-        ["competicoes", "🏆", "Competições"],
-        ["temporadas", "◷", "Temporadas"],
-        ["partidas", "▣", "Partidas"],
-        ["eventos_partida", "✦", "Eventos"],
-        ["usuarios", "♙", "Usuários"]
-    ];
+function mostrarMensagem(texto, tipo = "sucesso") {
+    const caixa = elemento("mensagem");
 
-    return links.map(([key, icon, label]) => `
-        <a class="nav-link ${PAGE === key ? "active" : ""}"
-           href="${key === "dashboard" ? "index.html" : pageName(key) + ".html"}">
-            <span class="nav-icon">${icon}</span>
-            <span>${label}</span>
-        </a>
-    `).join("");
+    if (!caixa) return;
+
+    caixa.textContent = texto;
+    caixa.className = `mensagem ${tipo}`;
 }
 
-function layout() {
-    const config = TABLES[PAGE];
-    const isDashboard = PAGE === "dashboard";
-    const title = isDashboard ? "Painel inicial" : config?.title || "FootballHub";
-    const description = isDashboard
-        ? "Visão geral do gerenciamento de futebol."
-        : "Cadastre, consulte e gerencie os dados.";
-
-    app.innerHTML = `
-        <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
-        <aside class="sidebar">
-            <div class="brand">
-                <div class="brand-logo">F</div>
-                <div>
-                    <strong>FootballHub</strong>
-                    <small>Gestão de futebol</small>
-                </div>
-            </div>
-
-            <div class="nav-label">Menu principal</div>
-            <nav>${navigation()}</nav>
-
-            <div class="nav-label">Sistema</div>
-            <div class="connection">
-                <span class="connection-dot" id="connection-dot"></span>
-                <span id="connection-label">Verificando banco...</span>
-            </div>
-        </aside>
-
-        <main class="main">
-            <header class="topbar">
-                <div class="topbar-left">
-                    <button class="mobile-menu" id="menu-button"
-                            type="button" aria-label="Abrir menu">☰</button>
-                    <span class="topbar-title">${esc(title)}</span>
-                </div>
-                <div class="topbar-right">
-                    <div class="connection">
-                        <span class="connection-dot" id="top-dot"></span>
-                        <span id="top-connection">Conectando...</span>
-                    </div>
-                </div>
-            </header>
-
-            <section class="content">
-                <div class="page-heading">
-                    <div>
-                        <h1>${esc(title)}</h1>
-                        <p>${esc(description)}</p>
-                    </div>
-                    <div class="heading-actions">
-                        ${isDashboard
-            ? `<button class="btn" id="refresh-dashboard" type="button">↻ Atualizar</button>`
-            : `
-                                <button class="btn" id="reload-records" type="button">↻ Atualizar</button>
-                                <button class="btn btn-primary" id="new-record" type="button">＋ Novo cadastro</button>
-                            `}
-                    </div>
-                </div>
-
-                ${isDashboard ? dashboardMarkup() : recordsMarkup(config)}
-            </section>
-        </main>
-
-        <div class="modal-backdrop" id="modal-backdrop" hidden>
-            <section class="modal" role="dialog" aria-modal="true"
-                     aria-labelledby="modal-title">
-                <div class="modal-header">
-                    <div>
-                        <h2 id="modal-title">Novo cadastro</h2>
-                        <p id="modal-description">Preencha os campos abaixo.</p>
-                    </div>
-                    <button class="modal-close" type="button"
-                            id="modal-close" aria-label="Fechar">✕</button>
-                </div>
-
-                <form id="record-form">
-                    <div class="form-grid" id="form-fields"></div>
-                    <div class="form-error" id="form-error" role="alert"></div>
-                    <div class="modal-footer">
-                        <button class="btn" type="button" id="cancel-button">Cancelar</button>
-                        <button class="btn btn-primary" type="submit" id="save-button">Salvar cadastro</button>
-                    </div>
-                </form>
-            </section>
-        </div>
-    `;
-}
-
-function dashboardMarkup() {
-    return `
-        <div class="stats-grid">
-            ${[
-            ["⚽", "Clubes cadastrados", "clubs-count"],
-            ["♟", "Jogadores cadastrados", "players-count"],
-            ["🏆", "Competições", "competitions-count"],
-            ["▣", "Partidas", "matches-count"]
-        ].map(([icon, label, id]) => `
-                <article class="stat-card">
-                    <div class="stat-icon">${icon}</div>
-                    <div>
-                        <div class="stat-label">${label}</div>
-                        <div class="stat-value" id="${id}">—</div>
-                    </div>
-                </article>
-            `).join("")}
-        </div>
-
-        <section class="panel">
-            <div class="panel-header">
-                <h2>Partidas recentes</h2>
-                <a class="btn btn-small" href="partidas.html">Ver partidas</a>
-            </div>
-            <div class="match-list" id="recent-matches">
-                <div class="empty-state">Carregando partidas...</div>
-            </div>
-        </section>
-    `;
-}
-
-function recordsMarkup(config) {
-    return `
-        <section class="panel">
-            <div class="panel-header">
-                <h2>Lista de ${esc(config.title.toLowerCase())}</h2>
-                <span class="result-count" id="result-count">Carregando...</span>
-            </div>
-
-            <div class="toolbar">
-                <input class="search" id="search-input" type="search"
-                       placeholder="Pesquisar registros..." aria-label="Pesquisar">
-            </div>
-
-            <div class="table-wrap">
-                <table>
-                    <thead id="table-head"></thead>
-                    <tbody id="table-body">
-                        <tr><td class="empty-state">Carregando...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="empty-state" id="empty-state" hidden>
-                Nenhum registro encontrado. Clique em “Novo cadastro” para começar.
-            </div>
-        </section>
-    `;
-}
-
-async function api(action, resource = null, extra = {}) {
-    const payload = { action, ...extra };
-    if (resource) payload.resource = resource;
-
-    let response;
+/*
+ * Lê a resposta como texto primeiro.
+ * Assim, se o PHP devolver uma resposta vazia ou inválida,
+ * mostramos uma mensagem mais útil em vez de apenas
+ * "Unexpected end of JSON input".
+ */
+async function requisicao(url, opcoes = {}) {
+    let resposta;
 
     try {
-        response = await fetch(API_URL, {
-            method: "POST",
+        resposta = await fetch(url, {
+            ...opcoes,
             headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
-            body: JSON.stringify(payload)
+                ...(opcoes.body ? { "Content-Type": "application/json" } : {}),
+                ...opcoes.headers
+            }
         });
-    } catch {
-        throw new Error("Não foi possível acessar o PHP. Inicie o Apache e confira a URL do projeto.");
+    } catch (erro) {
+        throw new Error(
+            "Não foi possível acessar o servidor. Confere se o Apache está ligado no XAMPP e se abriste o site pelo localhost."
+        );
     }
 
-    const text = await response.text();
-    let result;
+    const texto = await resposta.text();
+
+    if (!texto.trim()) {
+        const metodo = (opcoes.method || "GET").toUpperCase();
+        console.error("Resposta vazia da API:", {
+            url: resposta.url,
+            metodo,
+            status: resposta.status
+        });
+
+        throw new Error(
+            `A URL ${resposta.url} respondeu HTTP ${resposta.status} sem conteúdo (método ${metodo}). Abra o site pelo Apache em http://localhost/FootballHub2/clubes.html, não pelo Live Server.`
+        );
+    }
+
+    let dados;
 
     try {
-        result = JSON.parse(text);
-    } catch {
-        throw new Error("O PHP não retornou JSON válido. Confira os erros em api/api.php.");
+        dados = JSON.parse(texto);
+    } catch (erro) {
+        console.error("Resposta não JSON recebida do servidor:", texto);
+
+        throw new Error(
+            "O PHP não retornou JSON válido. Abre F12 > Network/Rede, clica na requisição api.php e confere a resposta."
+        );
     }
 
-    if (!response.ok || result.success === false) {
-        throw new Error(result.message || "A operação falhou.");
+    if (!resposta.ok || dados.sucesso === false) {
+        throw new Error(
+            dados.mensagem || `Erro do servidor (HTTP ${resposta.status}).`
+        );
     }
 
-    return result;
+    return dados;
 }
 
-async function checkConnection() {
-    const dot = document.querySelector("#connection-dot");
-    const topDot = document.querySelector("#top-dot");
-    const label = document.querySelector("#connection-label");
-    const topLabel = document.querySelector("#top-connection");
+async function listarRecurso(nome) {
+    const dados = await requisicao(
+        `${API}?recurso=${encodeURIComponent(nome)}`
+    );
 
-    try {
-        await api("health");
-        [dot, topDot].forEach(el => {
-            if (el) el.classList.add("online");
-        });
-        if (label) label.textContent = "Banco conectado";
-        if (topLabel) topLabel.textContent = "Conectado";
-    } catch (error) {
-        [dot, topDot].forEach(el => {
-            if (el) el.classList.add("offline");
-        });
-        if (label) label.textContent = "Banco indisponível";
-        if (topLabel) topLabel.textContent = "Sem conexão";
-        console.error(error);
+    if (!Array.isArray(dados.registros)) {
+        throw new Error(`A API não retornou uma lista válida para ${nome}.`);
+    }
+
+    return dados.registros;
+}
+
+function criarOpcao(valor, texto) {
+    const option = document.createElement("option");
+    option.value = valor;
+    option.textContent = texto;
+    return option;
+}
+
+async function carregarCampos() {
+    const container = elemento("campos-form");
+    container.innerHTML = "";
+
+    for (const campo of config.campos) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "campo";
+
+        const label = document.createElement("label");
+        label.htmlFor = campo.nome;
+        label.textContent = campo.label;
+
+        let input;
+
+        if (campo.tipo === "select" || campo.tipo === "relacao") {
+            input = document.createElement("select");
+
+            input.appendChild(
+                criarOpcao("", campo.placeholder || "Selecione uma opção")
+            );
+
+            if (campo.tipo === "relacao") {
+                try {
+                    const opcoes = await listarRecurso(campo.recurso);
+
+                    opcoes.forEach(opcao => {
+                        input.appendChild(
+                            criarOpcao(opcao.id, opcao.nome)
+                        );
+                    });
+                } catch (erro) {
+                    console.error(`Erro ao carregar ${campo.recurso}:`, erro);
+                    mostrarMensagem(
+                        `Não foi possível carregar ${campo.label.toLowerCase()}: ${erro.message}`,
+                        "erro"
+                    );
+                }
+            } else {
+                campo.opcoes.forEach(opcao => {
+                    input.appendChild(criarOpcao(opcao, opcao));
+                });
+            }
+        } else {
+            input = document.createElement("input");
+            input.type = campo.tipo || "text";
+        }
+
+        input.id = campo.nome;
+        input.name = campo.nome;
+        input.required = Boolean(campo.required);
+
+        if (campo.tipo === "number") {
+            input.min = "0";
+        }
+
+        if (campo.nome === "senha") {
+            input.autocomplete = "new-password";
+            input.placeholder = "Mínimo de 6 caracteres";
+        }
+
+        wrapper.append(label, input);
+        container.appendChild(wrapper);
     }
 }
 
-function formatValue(value, key) {
-    if (value === null || value === undefined || value === "") return "—";
+async function carregarRelacionamentos() {
+    const recursos = new Set(
+        config.campos
+            .filter(campo => campo.tipo === "relacao")
+            .map(campo => campo.recurso)
+    );
 
-    if (key === "valor_mercado" && Number.isFinite(Number(value))) {
-        return Number(value).toLocaleString("pt-BR", {
-            style: "currency", currency: "BRL"
-        });
+    for (const nome of recursos) {
+        try {
+            cacheRelacionamentos[nome] = await listarRecurso(nome);
+        } catch (erro) {
+            cacheRelacionamentos[nome] = [];
+            console.error(`Erro ao carregar relacionamento ${nome}:`, erro);
+        }
+    }
+}
+
+function valorFormatado(valor, campo) {
+    if (valor === null || valor === undefined || valor === "") {
+        return "—";
     }
 
-    if (["data_inicio", "data_fim", "data_nascimento"].includes(key)) {
-        const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (match) return `${match[3]}/${match[2]}/${match[1]}`;
-    }
+    if (campo.tipo === "date") {
+        const partes = String(valor).slice(0, 10).split("-");
 
-    if (key === "data_hora") {
-        const date = new Date(String(value).replace(" ", "T"));
-        if (!Number.isNaN(date.getTime())) {
-            return date.toLocaleString("pt-BR");
+        if (partes.length === 3) {
+            return `${partes[2]}/${partes[1]}/${partes[0]}`;
         }
     }
 
-    return String(value);
+    if (campo.tipo === "datetime-local") {
+        return String(valor).replace("T", " ").slice(0, 16);
+    }
+
+    if (campo.tipo === "relacao") {
+        const relacionados = cacheRelacionamentos[campo.recurso] || [];
+        const encontrado = relacionados.find(
+            registro => String(registro.id) === String(valor)
+        );
+
+        return encontrado ? encontrado.nome : valor;
+    }
+
+    return valor;
 }
 
-function recordId(record) {
-    const config = TABLES[PAGE];
-    return record[config.key] ?? record.id ?? null;
-}
+async function carregarTabela() {
+    const head = elemento("tabela-head");
+    const body = elemento("tabela-body");
 
-function renderTable() {
-    const config = TABLES[PAGE];
-    const head = document.querySelector("#table-head");
-    const body = document.querySelector("#table-body");
-    const search = (document.querySelector("#search-input")?.value || "")
-        .trim().toLocaleLowerCase("pt-BR");
+    try {
+        await carregarRelacionamentos();
+        registros = await listarRecurso(recurso);
 
-    if (!head || !body) return;
-
-    head.innerHTML = `
-        <tr>
-            ${config.columns.map(([, label]) => `<th>${esc(label)}</th>`).join("")}
-            <th>Ações</th>
-        </tr>
-    `;
-
-    const filtered = records.filter(record =>
-        Object.values(record).some(value =>
-            String(value ?? "").toLocaleLowerCase("pt-BR").includes(search)
-        )
-    );
-
-    body.innerHTML = filtered.map(record => {
-        const id = recordId(record);
-
-        return `
+        head.innerHTML = `
             <tr>
-                ${config.columns.map(([field]) =>
-            `<td>${esc(formatValue(record[field], field))}</td>`
-        ).join("")}
+                ${config.campos.map(campo => `<th>${escapar(campo.label)}</th>`).join("")}
+                <th>Ações</th>
+            </tr>
+        `;
+
+        if (registros.length === 0) {
+            body.innerHTML = `
+                <tr>
+                    <td class="vazio" colspan="${config.campos.length + 1}">
+                        Nenhum registro cadastrado.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        body.innerHTML = registros.map(registro => `
+            <tr>
+                ${config.campos.map(campo => `
+                    <td>${escapar(
+            campo.nome === "senha"
+                ? "••••••••"
+                : valorFormatado(registro[campo.nome], campo)
+        )}</td>
+                `).join("")}
                 <td>
-                    <div class="actions">
-                        <button class="btn btn-small" type="button"
-                                data-action="edit" data-id="${esc(id)}">Editar</button>
-                        <button class="btn btn-small btn-danger" type="button"
-                                data-action="delete" data-id="${esc(id)}">Excluir</button>
+                    <div class="acoes-tabela">
+                        <button type="button" class="pequeno" data-editar="${escapar(registro.id)}">
+                            Editar
+                        </button>
+                        <button type="button" class="pequeno perigo" data-excluir="${escapar(registro.id)}">
+                            Excluir
+                        </button>
                     </div>
                 </td>
             </tr>
-        `;
-    }).join("");
-
-    const empty = document.querySelector("#empty-state");
-    if (empty) empty.hidden = filtered.length !== 0;
-
-    document.querySelector("#result-count").textContent =
-        `${filtered.length} registro${filtered.length === 1 ? "" : "s"}`;
-
-    if (!filtered.length) {
-        body.innerHTML = `<tr><td colspan="${config.columns.length + 1}" class="empty-state">Nenhum registro encontrado.</td></tr>`;
+        `).join("");
+    } catch (erro) {
+        mostrarMensagem(`Erro ao carregar os registros: ${erro.message}`, "erro");
+        console.error(erro);
     }
 }
 
-async function loadRecords() {
-    const body = document.querySelector("#table-body");
-    if (body) body.innerHTML = `<tr><td class="empty-state">Carregando registros...</td></tr>`;
+function limparFormulario() {
+    registroEditando = null;
+    elemento("form-registro").reset();
+
+    elemento("titulo-form").textContent = `Cadastrar ${config.titulo}`;
+    elemento("btn-salvar").textContent = `Cadastrar ${config.titulo}`;
+    elemento("btn-cancelar").hidden = true;
+
+    const senha = elemento("senha");
+
+    if (senha) {
+        senha.required = true;
+        senha.placeholder = "Mínimo de 6 caracteres";
+    }
+}
+
+function preencherFormulario(id) {
+    const registro = registros.find(
+        item => String(item.id) === String(id)
+    );
+
+    if (!registro) return;
+
+    registroEditando = registro.id;
+
+    elemento("titulo-form").textContent = `Editar ${config.titulo}`;
+    elemento("btn-salvar").textContent = "Salvar alterações";
+    elemento("btn-cancelar").hidden = false;
+
+    config.campos.forEach(campo => {
+        const input = elemento(campo.nome);
+
+        if (!input) return;
+
+        if (campo.nome === "senha") {
+            input.value = "";
+            input.required = false;
+            input.placeholder = "Deixe vazio para manter a senha atual";
+            return;
+        }
+
+        let valor = registro[campo.nome] ?? "";
+
+        if (campo.tipo === "datetime-local" && valor) {
+            valor = String(valor).replace(" ", "T").slice(0, 16);
+        }
+
+        input.value = valor;
+    });
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function salvarRegistro(evento) {
+    evento.preventDefault();
+
+    const botao = elemento("btn-salvar");
+    botao.disabled = true;
 
     try {
-        const result = await api("list", PAGE);
-        records = Array.isArray(result.data) ? result.data :
-            Array.isArray(result.records) ? result.records : [];
-        renderTable();
-    } catch (error) {
-        if (body) {
-            body.innerHTML = `<tr><td class="empty-state">${esc(error.message)}</td></tr>`;
-        }
-        document.querySelector("#result-count").textContent = "Erro ao carregar";
-    }
-}
+        const dados = {};
 
-function makeField(field, record = {}) {
-    const [name, label, type = "text", required = false, defaultValue = "", options] = field;
-    let value = record[name] ?? defaultValue;
+        for (const campo of config.campos) {
+            const input = elemento(campo.nome);
+            let valor = input.value.trim();
 
-    if (type === "datetime-local" && value) {
-        value = String(value).replace(" ", "T").slice(0, 16);
-    }
+            if (campo.tipo === "number" && valor !== "") {
+                valor = Number(valor);
+            }
 
-    if (type === "date" && value) value = String(value).slice(0, 10);
+            // Se estiver editando e a senha ficar vazia,
+            // não envia o campo para manter a senha existente.
+            if (campo.nome === "senha" && registroEditando && !valor) {
+                continue;
+            }
 
-    if (type === "password" && record[name]) value = "";
-
-    const req = required ? "required" : "";
-    const id = `field-${name}`;
-    let input;
-
-    if (type === "select") {
-        input = `
-            <select id="${id}" name="${name}" ${req}>
-                <option value="">Selecione...</option>
-                ${(options || []).map(([v, text]) => `
-                    <option value="${esc(v)}" ${String(value) === v ? "selected" : ""}>
-                        ${esc(text)}
-                    </option>
-                `).join("")}
-            </select>
-        `;
-    } else if (type === "textarea") {
-        input = `<textarea id="${id}" name="${name}" ${req}>${esc(value)}</textarea>`;
-    } else {
-        input = `
-            <input id="${id}" name="${name}" type="${type}"
-                value="${esc(value)}" ${req}
-                ${type === "number" ? 'step="any"' : ""}
-                ${type === "password" ? 'autocomplete="new-password"' : ""}>
-        `;
-    }
-
-    return `
-        <div class="form-group ${type === "textarea" || type === "url" ? "full" : ""}">
-            <label for="${id}">${esc(label)}${required ? " *" : ""}</label>
-            ${input}
-        </div>
-    `;
-}
-
-function openForm(record = null) {
-    editing = record;
-    busy = false;
-
-    const config = TABLES[PAGE];
-    document.querySelector("#modal-title").textContent =
-        `${record ? "Editar" : "Novo cadastro"} — ${config.singular}`;
-
-    document.querySelector("#modal-description").textContent =
-        record ? "Atualize os campos e salve as alterações." : "Preencha os dados abaixo.";
-
-    document.querySelector("#form-fields").innerHTML =
-        config.fields.map(field => makeField(field, record || {})).join("");
-
-    document.querySelector("#form-error").textContent = "";
-
-    // A senha só é obrigatória ao criar usuário.
-    if (record && PAGE === "usuarios") {
-        const password = document.querySelector("#field-senha");
-        if (password) password.required = false;
-    }
-
-    document.querySelector("#save-button").textContent =
-        record ? "Salvar alterações" : "Registrar cadastro";
-
-    document.querySelector("#modal-backdrop").hidden = false;
-    document.body.classList.add("modal-open");
-
-    document.querySelector("#form-fields input, #form-fields select, #form-fields textarea")?.focus();
-}
-
-function closeForm() {
-    document.querySelector("#modal-backdrop").hidden = true;
-    document.body.classList.remove("modal-open");
-    editing = null;
-}
-
-async function saveForm(event) {
-    event.preventDefault();
-    if (busy) return;
-
-    const form = event.currentTarget;
-    if (!form.reportValidity()) return;
-
-    const config = TABLES[PAGE];
-    const data = {};
-    const formData = new FormData(form);
-
-    for (const [key, raw] of formData.entries()) {
-        let value = String(raw).trim();
-
-        if (key === "senha" && value === "" && editing) continue;
-
-        const field = config.fields.find(item => item[0] === key);
-
-        if (field?.[2] === "number" && value !== "") {
-            value = Number(value);
+            dados[campo.nome] = valor === "" ? null : valor;
         }
 
-        if (field?.[2] === "datetime-local" && value) {
-            value = value.replace("T", " ") + ":00";
+        if (
+            recurso === "partidas" &&
+            String(dados.mandante_id) === String(dados.visitante_id)
+        ) {
+            throw new Error(
+                "O clube mandante e o visitante precisam ser diferentes."
+            );
         }
 
-        data[key] = value === "" ? null : value;
-    }
+        const corpo = {
+            acao: registroEditando ? "atualizar" : "criar",
+            recurso,
+            dados
+        };
 
-    if (PAGE === "partidas" &&
-        data.mandante_id && data.visitante_id &&
-        Number(data.mandante_id) === Number(data.visitante_id)) {
-        document.querySelector("#form-error").textContent =
-            "O clube mandante e o visitante precisam ser diferentes.";
+        if (registroEditando) {
+            corpo.id = registroEditando;
+        }
+
+        await requisicao(API, {
+            method: "POST",
+            body: JSON.stringify(corpo)
+        });
+
+        mostrarMensagem(
+            registroEditando
+                ? "Registro atualizado com sucesso!"
+                : "Registro cadastrado com sucesso!"
+        );
+
+        limparFormulario();
+        await carregarCampos();
+        await carregarTabela();
+
+    } catch (erro) {
+        mostrarMensagem(erro.message, "erro");
+        console.error("Erro ao salvar:", erro);
+    } finally {
+        botao.disabled = false;
+    }
+}
+
+async function excluirRegistro(id) {
+    if (!window.confirm("Tem certeza de que deseja excluir este registro?")) {
         return;
     }
 
-    busy = true;
-    const button = document.querySelector("#save-button");
-    button.disabled = true;
-    button.textContent = "Salvando...";
+    try {
+        await requisicao(API, {
+            method: "POST",
+            body: JSON.stringify({
+                acao: "excluir",
+                recurso,
+                id
+            })
+        });
+
+        mostrarMensagem("Registro excluído com sucesso!");
+
+        if (String(registroEditando) === String(id)) {
+            limparFormulario();
+        }
+
+        await carregarTabela();
+
+    } catch (erro) {
+        mostrarMensagem(`Não foi possível excluir: ${erro.message}`, "erro");
+        console.error("Erro ao excluir:", erro);
+    }
+}
+
+async function iniciar() {
+    if (!config) return;
+
+    elemento("form-registro").addEventListener("submit", salvarRegistro);
+    elemento("btn-cancelar").addEventListener("click", limparFormulario);
+
+    elemento("tabela-body").addEventListener("click", evento => {
+        const botaoEditar = evento.target.closest("[data-editar]");
+        const botaoExcluir = evento.target.closest("[data-excluir]");
+
+        if (botaoEditar) {
+            preencherFormulario(botaoEditar.dataset.editar);
+        }
+
+        if (botaoExcluir) {
+            excluirRegistro(botaoExcluir.dataset.excluir);
+        }
+    });
 
     try {
-        if (editing) {
-            const id = recordId(editing);
-            await api("update", PAGE, {
-                id,
-                [config.key]: id,
-                data
-            });
-        } else {
-            await api("create", PAGE, { data });
-        }
-
-        closeForm();
-        await loadRecords();
-    } catch (error) {
-        document.querySelector("#form-error").textContent = error.message;
-    } finally {
-        busy = false;
-        button.disabled = false;
-        button.textContent = editing ? "Salvar alterações" : "Registrar cadastro";
+        await carregarCampos();
+        await carregarTabela();
+    } catch (erro) {
+        mostrarMensagem(erro.message, "erro");
+        console.error(erro);
     }
 }
 
-async function deleteRecord(id) {
-    const config = TABLES[PAGE];
-    const record = records.find(item => String(recordId(item)) === String(id));
-    if (!record) return;
-
-    const name = record.nome || record.email || `${config.singular} ${id}`;
-
-    if (!confirm(`Deseja realmente excluir "${name}"?`)) return;
-
-    try {
-        await api("delete", PAGE, { id, [config.key]: id });
-        await loadRecords();
-    } catch (error) {
-        alert(`Não foi possível excluir: ${error.message}`);
-    }
-}
-
-async function loadDashboard() {
-    const resources = [
-        ["clubes", "clubs-count"],
-        ["jogadores", "players-count"],
-        ["competicoes", "competitions-count"],
-        ["partidas", "matches-count"]
-    ];
-
-    for (const [resource, elementId] of resources) {
-        const element = document.getElementById(elementId);
-        if (!element) continue;
-
-        try {
-            const result = await api("list", resource);
-            const data = result.data || result.records || [];
-            element.textContent = data.length;
-        } catch {
-            element.textContent = "—";
-        }
-    }
-
-    const container = document.querySelector("#recent-matches");
-    if (!container) return;
-
-    try {
-        const result = await api("list", "partidas");
-        const matches = result.data || result.records || [];
-
-        matches.sort((a, b) =>
-            String(b.data_hora || "").localeCompare(String(a.data_hora || ""))
-        );
-
-        const recent = matches.slice(0, 5);
-
-        container.innerHTML = recent.length ? recent.map(match => `
-            <div class="match-row">
-                <div class="match-team">
-                    <strong>${esc(match.mandante_nome || match.nome_mandante || `Clube ${match.mandante_id}`)}</strong>
-                </div>
-                <div class="match-score">
-                    ${match.gols_mandante ?? "—"} × ${match.gols_visitante ?? "—"}
-                </div>
-                <div class="match-team">
-                    <strong>${esc(match.visitante_nome || match.nome_visitante || `Clube ${match.visitante_id}`)}</strong>
-                </div>
-            </div>
-        `).join("") : `<div class="empty-state">Nenhuma partida cadastrada.</div>`;
-    } catch {
-        container.innerHTML = `<div class="empty-state">Não foi possível carregar as partidas.</div>`;
-    }
-}
-
-function initializeEvents() {
-    document.querySelector("#menu-button")?.addEventListener("click", () => {
-        document.body.classList.toggle("menu-open");
-    });
-
-    document.querySelector("#sidebar-overlay")?.addEventListener("click", () => {
-        document.body.classList.remove("menu-open");
-    });
-
-    document.querySelector("#new-record")?.addEventListener("click", () => openForm());
-    document.querySelector("#reload-records")?.addEventListener("click", loadRecords);
-    document.querySelector("#refresh-dashboard")?.addEventListener("click", async () => {
-        await checkConnection();
-        await loadDashboard();
-    });
-
-    document.querySelector("#record-form")?.addEventListener("submit", saveForm);
-    document.querySelector("#modal-close")?.addEventListener("click", closeForm);
-    document.querySelector("#cancel-button")?.addEventListener("click", closeForm);
-
-    document.querySelector("#modal-backdrop")?.addEventListener("click", event => {
-        if (event.target.id === "modal-backdrop") closeForm();
-    });
-
-    document.querySelector("#search-input")?.addEventListener("input", renderTable);
-
-    document.querySelector("#table-body")?.addEventListener("click", event => {
-        const button = event.target.closest("button[data-action]");
-        if (!button) return;
-
-        const { action, id } = button.dataset;
-
-        if (action === "edit") {
-            const record = records.find(item => String(recordId(item)) === String(id));
-            if (record) openForm(record);
-        }
-
-        if (action === "delete") deleteRecord(id);
-    });
-
-    document.addEventListener("keydown", event => {
-        if (event.key === "Escape") {
-            closeForm();
-            document.body.classList.remove("menu-open");
-        }
-    });
-
-    window.addEventListener("resize", () => {
-        if (window.innerWidth > 760) {
-            document.body.classList.remove("menu-open");
-        }
-    });
-}
-
-async function initialize() {
-    if (!app) return;
-
-    layout();
-    initializeEvents();
-    await checkConnection();
-
-    if (PAGE === "dashboard") {
-        await loadDashboard();
-    } else if (TABLES[PAGE]) {
-        await loadRecords();
-    }
-}
-
-document.addEventListener("DOMContentLoaded", initialize);
+document.addEventListener("DOMContentLoaded", iniciar);
