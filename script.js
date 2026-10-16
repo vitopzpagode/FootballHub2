@@ -272,6 +272,34 @@ function criarOpcao(valor, texto) {
     return option;
 }
 
+function rotuloRelacionamento(nomeRecurso, registro) {
+    if (!registro) return "Registro indisponível";
+
+    if (nomeRecurso === "partidas") {
+        const clubes = cacheRelacionamentos.clubes || [];
+        const localizarClube = id => clubes.find(
+            clube => String(clube.id) === String(id)
+        );
+        const nomeClube = id => {
+            const clube = localizarClube(id);
+            return clube
+                ? (clube.sigla || clube.nome || `Clube #${id}`).toUpperCase()
+                : `Clube #${id ?? "?"}`;
+        };
+        const dataHoraOriginal = String(registro.data_hora || "").replace("T", " ").slice(0, 16);
+        const partesDataHora = dataHoraOriginal.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/);
+        const dataHora = partesDataHora
+            ? `${partesDataHora[3]}/${partesDataHora[2]}/${partesDataHora[1]} ${partesDataHora[4]}:${partesDataHora[5]}`
+            : (dataHoraOriginal || "Data não informada");
+
+        // O ID torna o rótulo único mesmo se os mesmos clubes jogarem
+        // novamente no mesmo horário.
+        return `${nomeClube(registro.mandante_id)} x ${nomeClube(registro.visitante_id)} — ${dataHora} (Partida #${registro.id})`;
+    }
+
+    return registro.nome || `Registro #${registro.id}`;
+}
+
 async function carregarCampos() {
     const container = elemento("campos-form");
     container.innerHTML = "";
@@ -295,11 +323,18 @@ async function carregarCampos() {
 
             if (campo.tipo === "relacao") {
                 try {
+                    if (campo.recurso === "partidas" && !cacheRelacionamentos.clubes) {
+                        cacheRelacionamentos.clubes = await listarRecurso("clubes");
+                    }
+
                     const opcoes = await listarRecurso(campo.recurso);
 
                     opcoes.forEach(opcao => {
                         input.appendChild(
-                            criarOpcao(opcao.id, opcao.nome)
+                            criarOpcao(
+                                opcao.id,
+                                rotuloRelacionamento(campo.recurso, opcao)
+                            )
                         );
                     });
                 } catch (erro) {
@@ -352,6 +387,15 @@ async function carregarRelacionamentos() {
             console.error(`Erro ao carregar relacionamento ${nome}:`, erro);
         }
     }
+
+    if (recursos.has("partidas") && !cacheRelacionamentos.clubes) {
+        try {
+            cacheRelacionamentos.clubes = await listarRecurso("clubes");
+        } catch (erro) {
+            cacheRelacionamentos.clubes = [];
+            console.error("Erro ao carregar clubes para identificar partidas:", erro);
+        }
+    }
 }
 
 function valorFormatado(valor, campo) {
@@ -377,7 +421,9 @@ function valorFormatado(valor, campo) {
             registro => String(registro.id) === String(valor)
         );
 
-        return encontrado ? encontrado.nome : valor;
+        return encontrado
+            ? rotuloRelacionamento(campo.recurso, encontrado)
+            : valor;
     }
 
     return valor;
